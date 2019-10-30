@@ -25,8 +25,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "function.h"
-#define PROTOPORT 27015 // default protocol port number
-#define QLEN 6 // size of request queue
+#define PROTOPORT 27015
+#define QLEN 6 // Numero massimo di client
 #define CONN "connessione avvenuta"
 
 struct msgStruct{
@@ -36,6 +36,7 @@ struct msgStruct{
 	float result;
 	char* error;
 }msg;
+
 
 void errorhandler(char *errorMessage) {
 	printf ("%s", errorMessage);
@@ -51,16 +52,16 @@ void clearwinsock() {
 int main(int argc, char *argv[]) {
 	int port;
 	if (argc > 1) {
-		port = atoi(argv[1]); // if argument specified convert argument to binary
+		port = atoi(argv[1]);
 	}
 	else
-		port = PROTOPORT; // use default port number
+		port = PROTOPORT;
 	if (port < 0) {
 		printf("bad port number %s \n", argv[1]);
 		return 0;
 	}
 #if defined WIN32
-	// Initialize Winsock
+	// Inizializzazione winsock
 	WSADATA wsa_data;
 	int result = WSAStartup(MAKEWORD(2,2), &wsa_data);
 	if (result != 0) {
@@ -68,7 +69,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 #endif
-	// Socket creation
+	// Creazione della socket
 	int my_socket;
 	my_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (my_socket < 0) {
@@ -76,7 +77,7 @@ int main(int argc, char *argv[]) {
 		clearwinsock();
 		return -1;
 	}
-	// Socker address
+	// Costruzione indirizzo
 	struct sockaddr_in sad;
 	memset(&sad, 0, sizeof(sad)); // ensures that extra bytes contain 0
 	sad.sin_family = AF_INET;
@@ -88,24 +89,24 @@ int main(int argc, char *argv[]) {
 		clearwinsock();
 		return -1;
 	}
-	// Socket listening
+	// socket in ascolto
 	if (listen (my_socket, QLEN) < 0) {
 		errorhandler("listen() failed.\n");
 		closesocket(my_socket);
 		clearwinsock();
 		return -1;
 	}
-	// Accepting a new connection
-	struct sockaddr_in cad; // structure for the client address
-	int client_socket; // socket descriptor for the client
-	int client_len; // the size of the client address
-	printf("Waiting for a client to connect...");
-	while (1) { /* oppure for (;;) */
-		client_len = sizeof(cad); // set the size of the client address
+	// Accettazione di una nuova connessione
+	struct sockaddr_in cad;
+	int client_socket;
+	int client_len;
+	printf("In attesa di connessione di un Client...");
+	while (1) {
+		client_len = sizeof(cad);
 		if ((client_socket = accept(my_socket, (struct sockaddr*)&cad, &client_len)) < 0) {
 			errorhandler("accept() failed.\n");
 
-			// Connection closing
+			// Chiusura connessione
 			closesocket(my_socket);
 			clearwinsock();
 			return 0;
@@ -115,54 +116,51 @@ int main(int argc, char *argv[]) {
 		if (vsend != sizeof(CONN)) {
 			errorhandler("send() sent a different number of bytes than expected\n");
 		}
-		//  Receive data from the server
+		//  Ricezione dei dati
 		int bytes_rcvd;
 		int total_bytes_rcvd = 0;
-		printf("\nReceived: "); // Setup to print the echoed string
+		printf("\nMessaggio ricevuto: ");
 		while (total_bytes_rcvd < sizeof(msg)) {
 			if ((bytes_rcvd = recv(client_socket, &msg, sizeof(msg), 0)) <= 0) {
 				errorhandler("\nrecv() failed or connection closed prematurely");
-				closesocket(my_socket);
-				clearwinsock();
-				return -1;
+				break;
 			}
-			total_bytes_rcvd += bytes_rcvd; // Keep tally of total bytes
-			printf("%c %d %d", msg.op, msg.num1, msg.num2); // Print the echo buffer
+			total_bytes_rcvd += bytes_rcvd;
+			printf("%c %d %d", msg.op, msg.num1, msg.num2);
+
+			// Invio dati
+			switch(msg.op){
+			case 'A':
+			case 'a':
+				msg.result=add(msg.num1, msg.num2);
+				break;
+
+			case 'M':
+			case 'm':
+				msg.result=mult(msg.num1, msg.num2);
+				break;
+
+			case 'S':
+			case 's':
+				msg.result=sub(msg.num1, msg.num2);
+				break;
+
+			case 'D':
+			case 'd':
+				msg.result=divi(msg.num1, msg.num2);
+				break;
+
+			default:
+				msg.result=0;
+				msg.error="TERMINE PROCESSO CLIENT";
+				break;
+			}
+
+			int vsend2 = send(client_socket, &msg, sizeof(msg), 0);
+			if (vsend2 != sizeof(msg)) {
+				errorhandler("send() sent a different number of bytes than expected\n");
+			}
 		}
-
-		// Sending data
-		switch(msg.op){
-		case 'A':
-		case 'a':
-			msg.result=add(msg.num1, msg.num2);
-			break;
-
-		case 'M':
-		case 'm':
-			msg.result=mult(msg.num1, msg.num2);
-			break;
-
-		case 'S':
-		case 's':
-			msg.result=sub(msg.num1, msg.num2);
-			break;
-
-		case 'D':
-		case 'd':
-			msg.result=divi(msg.num1, msg.num2);
-			break;
-
-		default:
-			msg.result=0;
-			msg.error="TERMINE PROCESSO CLIENT";
-			break;
-		}
-
-		int vsend2 = send(client_socket, &msg, sizeof(msg), 0);
-		if (vsend2 != sizeof(msg)) {
-			errorhandler("send() sent a different number of bytes than expected\n");
-		}
-
 	}
 	closesocket(client_socket);
 	clearwinsock();

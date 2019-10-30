@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define PROTOPORT 27015 // Numero di porta di default
+#define PROTOPORT 27015 // Numero di porta
 #define IP "127.0.0.1" //localhost
 
 struct msgStruct{
@@ -46,6 +46,7 @@ void clearwinsock() {
 
 
 int main(void) {
+	// Inizializzazione winsock
 	WSADATA wsa_data;
 	int result = WSAStartup(MAKEWORD(2 ,2), &wsa_data);
 	if (result != 0) {
@@ -53,7 +54,7 @@ int main(void) {
 		return -1;
 	}
 
-	// Socket creation
+	// Creazione della socket
 	int c_socket;
 	c_socket = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (c_socket < 0) {
@@ -62,14 +63,14 @@ int main(void) {
 		clearwinsock();
 		return -1;
 	}
-	// Build server address
+	// Costruzione indirizzo client
 	struct sockaddr_in sad;
 	memset(&sad, 0, sizeof(sad));
 	sad.sin_family = AF_INET;
-	sad.sin_addr.s_addr = inet_addr(IP); // IP server "127.0.0.1"
-	sad.sin_port = htons(PROTOPORT); // Server port 27015
+	sad.sin_addr.s_addr = inet_addr(IP);
+	sad.sin_port = htons(PROTOPORT);
 
-	// Connection to server
+	// Connessione al server
 	if (connect(c_socket, (struct sockaddr *)&sad, sizeof(sad))< 0)
 	{
 		errorhandler( "Failed to connect.\n" );
@@ -80,7 +81,7 @@ int main(void) {
 	int msg_len = sizeof(conn);
 	int bytes_rcvd;
 	int total_bytes_rcvd = 0;
-	printf("Received: "); // Setup to print the echoed string
+	printf("Messaggio ricevuto: ");
 	while (total_bytes_rcvd < msg_len) {
 		if ((bytes_rcvd = recv(c_socket, conn, msg_len, 0)) <= 0) {
 			errorhandler("recv() failed or connection closed prematurely\n");
@@ -88,10 +89,10 @@ int main(void) {
 			clearwinsock();
 			return -1;
 		}
-		total_bytes_rcvd += bytes_rcvd; // Keep tally of total bytes
+		total_bytes_rcvd += bytes_rcvd;
 		printf ("%s", &conn);
 	}
-	// Sending data
+	// Invio dati
 	puts("\nInserisci comandi ");
 	fflush(stdin);
 	char* temp = malloc(8);
@@ -112,10 +113,10 @@ int main(void) {
 		return -1;
 	}
 
-	//  Receive data from the server
+	//  Ricezioni dati
 	int bytes_rcvd2;
 	int total_bytes_rcvd2 = 0;
-	printf("Received: "); // Setup to print the echoed string
+	printf("Messaggio ricevuto: ");
 	while (total_bytes_rcvd2 < msg_len2) {
 		if ((bytes_rcvd2 = recv(c_socket, &msg, msg_len2, 0)) <= 0) {
 			errorhandler("recv() failed or connection closed prematurely\n");
@@ -123,13 +124,17 @@ int main(void) {
 			clearwinsock();
 			return -1;
 		}
-		total_bytes_rcvd2 += bytes_rcvd2; // Keep tally of total bytes
+		total_bytes_rcvd2 += bytes_rcvd2;
 		if(msg.result == 0 && msg.error != NULL){
 			printf("chiusura processo\n");
 			closesocket(c_socket);
 			clearwinsock();
 		}
+		else{
+			printf("%.3f\n", msg.result);
+			closesocket(c_socket);
+			clearwinsock();
+		}
 	}
-
 	return 0;
 }
